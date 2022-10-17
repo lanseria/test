@@ -4,4 +4,4 @@
 
 目前测试用例有:
 
-1. timerangecheck 时间段内校验测试
+1. `timerangecheck` 时间段内校验测试 [timerangecheck.ts](./timerangecheck.ts)
