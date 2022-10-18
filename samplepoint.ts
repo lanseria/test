@@ -282,7 +282,7 @@ async function main() {
   const isFormatDataExist = fs.existsSync('./formatData.json')
   if (!isFormatDataExist)
     otherParseData()
-  transToGeoJson()
+  // transToGeoJson()
 }
 
 main()
