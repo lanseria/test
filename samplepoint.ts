@@ -3,9 +3,14 @@ import stream from 'node:stream'
 import fs from 'node:fs'
 import got from 'got'
 import CryptoJS from 'crypto-js'
+import dayjs from 'dayjs'
+import gcoord from 'gcoord'
+import relativeTime from 'dayjs/plugin/relativeTime'
 import type { SamplePoint } from './samplepoint.const'
 import strTimeRangeMap from './strTimeRangeMap.json'
 import { IV, WordArray, excludeRange1, excludeRange2, weekCnMap } from './samplepoint.const'
+
+dayjs.extend(relativeTime)
 
 async function fetchData() {
   const pipeline = promisify(stream.pipeline)
@@ -198,12 +203,86 @@ async function parseData() {
   fs.writeFileSync('./formartData.json', JSON.stringify(formartData))
 }
 
+async function otherParseData() {
+  const data = fs.readFileSync('./formartData.json', {
+    encoding: 'utf-8',
+  })
+  const buildTime = dayjs().valueOf()
+  const resData = {
+    buildTime,
+    data: JSON.parse(data),
+  }
+  // const time = dayjs(buildTime).fromNow()
+  // console.log(time)
+  // console.log(resData)
+  fs.writeFileSync('./formatData.json', JSON.stringify(resData))
+}
+
+async function transToGeoJson() {
+  const data = fs.readFileSync('./formatData.json', {
+    encoding: 'utf-8',
+  })
+  console.log(data)
+  const parseData = JSON.parse(data)
+  const features = parseData.data.map((item: any) => {
+    const loc = gcoord.transform(
+      [+item.gisLng, +item.gisLat], // 经纬度坐标
+      gcoord.GCJ02, // 当前坐标系
+      gcoord.WGS84, // 目标坐标系
+    )
+    return {
+      type: 'Feature',
+      properties: {
+        'details': {
+          ID: item.orgId,
+          名称: item.orgName,
+          详情地址: item.address,
+          联系电话: item.phone,
+          类型: item.levelName,
+          工作时间: item.workTime,
+        },
+        //
+        'openTimeRange': item.openTimeRange,
+
+        // 名称
+        'name': item.orgName,
+        // 在线 关闭
+        'status': '关闭',
+        // 微博链接
+        'weiboUrl': '',
+        // #50C240 在线 #eeeeee 关闭
+        'marker-color': '#eeeeee',
+        // mdi:hospital-building mdi:dna
+        'marker-icon': 'mdi:dna',
+
+      },
+      geometry: {
+        type: 'Point',
+        coordinates: loc,
+      },
+    }
+  })
+  const geoJson = {
+    type: 'FeatureCollection',
+    features,
+  }
+  fs.writeFileSync('./zhoushan.geojson', JSON.stringify(geoJson, null, 2))
+  fs.writeFileSync('./zhoushan.build.txt', parseData.buildTime.toString())
+}
+
 async function main() {
-  const isExist = fs.existsSync('./data.txt')
-  if (isExist)
+  const isDataExist = fs.existsSync('./data.txt')
+  if (!isDataExist)
     await fetchData()
 
-  await parseData()
+  const isFormartDataExist = fs.existsSync('./formartData.json')
+  if (!isFormartDataExist)
+    await parseData()
+
+  const isFormatDataExist = fs.existsSync('./formatData.json')
+  if (!isFormatDataExist)
+    otherParseData()
+  transToGeoJson()
 }
 
 main()
